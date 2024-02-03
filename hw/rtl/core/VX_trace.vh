@@ -36,22 +36,26 @@ task trace_ex_op(input int level,
                  `UNUSED_ARG(input [`XLEN-1:0] imm)
 );
 
+static bit fdst_d = 0;
+static bit fcvt_l = 0;
+static bit rd_float = 0;
+
 `ifdef FLEN_64
-    logic fdst_d = imm[0];
+     fdst_d <= imm[0];
 `else
-    logic fdst_d = 0;
+    fdst_d <= 0;
 `endif
 
 `ifdef XLEN_64
-    logic fcvt_l = imm[1];
+    fcvt_l <= imm[1];
 `else
-    logic fcvt_l = 0;
+    fcvt_l <= 0;
 `endif
 
 `ifdef EXT_F_ENABLE
-    logic rd_float = 1'(rd >> 5) || 1'(rs2 >> 5);
+    rd_float <= 1'(rd >> 5) || 1'(rs2 >> 5);
 `else
-    logic rd_float = 0;
+    rd_float <= 0;
 `endif
 
     case (ex_type)
