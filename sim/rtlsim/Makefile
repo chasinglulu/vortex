@@ -6,15 +6,27 @@ THIRD_PARTY_DIR = $(abspath ../../third_party)
 RTL_DIR = $(HW_DIR)/rtl
 DPI_DIR = $(HW_DIR)/dpi
 
-CXXFLAGS += -std=c++11 -Wall -Wextra -Wfatal-errors -Wno-array-bounds
+ifdef SYSTEMC
+SYSTEMC_DIR ?= /usr/local
+SYSTEMC_INCLUDE ?= $(SYSTEMC_DIR)/include/
+SYSTEMC_LIBDIR ?= $(SYSTEMC_DIR)/lib-linux64
+endif
+
+CXXFLAGS += -std=c++17 -Wall -Wextra -Wfatal-errors -Wno-array-bounds
 CXXFLAGS += -fPIC -Wno-maybe-uninitialized
 CXXFLAGS += -I$(HW_DIR) -I$(COMMON_DIR)
 CXXFLAGS += -I$(THIRD_PARTY_DIR)/softfloat/source/include
 CXXFLAGS += -I$(THIRD_PARTY_DIR)
 CXXFLAGS += -DXLEN_$(XLEN)
+ifdef SYSTEMC
+CXXFLAGS += -I$(SYSTEMC_INCLUDE)
+endif
 
 LDFLAGS += $(THIRD_PARTY_DIR)/softfloat/build/Linux-x86_64-GCC/softfloat.a
 LDFLAGS += -L$(THIRD_PARTY_DIR)/ramulator -lramulator
+ifdef SYSTEMC
+LDFLAGS += -L $(SYSTEMC_LIBDIR) -lsystemc
+endif
 
 # control RTL debug tracing states
 DBG_TRACE_FLAGS += -DDBG_TRACE_CORE_PIPELINE  
@@ -61,7 +73,12 @@ VL_FLAGS += -DXLEN_$(XLEN)
 VL_FLAGS += $(CONFIGS)
 VL_FLAGS += $(RTL_INCLUDE)
 VL_FLAGS += $(RTL_PKGS)
+ifdef SYSTEMC
+VL_FLAGS += --sc $(TOP) --top-module $(TOP)
+VL_ENV=SYSTEMC_INCLUDE=$(SYSTEMC_INCLUDE) SYSTEMC_LIBDIR=$(SYSTEMC_LIBDIR)
+else
 VL_FLAGS += --cc $(TOP) --top-module $(TOP)
+endif
 
 CXXFLAGS += $(CONFIGS)
 
@@ -90,10 +107,10 @@ PROJECT = rtlsim
 all: $(DESTDIR)/$(PROJECT)
 
 $(DESTDIR)/$(PROJECT): $(SRCS) $(CURDIR)/main.cpp
-	verilator --build $(VL_FLAGS) $^ -CFLAGS '$(CXXFLAGS) -DSTARTUP_ADDR=0x80000000' -LDFLAGS '$(LDFLAGS)' --Mdir $(DESTDIR)/obj_dir -o $@
+	$(VL_ENV) verilator --build $(VL_FLAGS) $^ -CFLAGS '$(CXXFLAGS) -DSTARTUP_ADDR=0x80000000' -LDFLAGS '$(LDFLAGS)' --Mdir $(DESTDIR)/obj_dir -o $@
 	
 $(DESTDIR)/lib$(PROJECT).so: $(SRCS)
-	verilator --build $(VL_FLAGS) $^ -CFLAGS '$(CXXFLAGS)' -LDFLAGS '-shared $(LDFLAGS)' --Mdir $(DESTDIR)/obj_dir -o $@
+	$(VL_ENV) verilator --build $(VL_FLAGS) $^ -CFLAGS '$(CXXFLAGS)' -LDFLAGS '-shared $(LDFLAGS)' --Mdir $(DESTDIR)/obj_dir -o $@
 
 clean:
 	rm -rf $(DESTDIR)/obj_dir $(DESTDIR)/$(PROJECT) $(DESTDIR)/lib$(PROJECT).so
