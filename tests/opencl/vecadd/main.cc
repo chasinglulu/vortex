@@ -15,7 +15,7 @@
      if (_err == CL_SUCCESS)                                           \
        break;                                                          \
      printf("OpenCL Error: '%s' returned %d!\n", #_expr, (int)_err);   \
-	 cleanup();			                                                     \
+     cleanup();                                                        \
      exit(-1);                                                         \
    } while (0)
 
@@ -25,7 +25,7 @@
      decltype(_expr) _ret = _expr;                                     \
      if (_err != CL_SUCCESS) {                                         \
        printf("OpenCL Error: '%s' returned %d!\n", #_expr, (int)_err); \
-	   cleanup();			                                                   \
+       cleanup();                                                      \
        exit(-1);                                                       \
      }                                                                 \
      _ret;                                                             \
@@ -141,7 +141,7 @@ int main (int argc, char **argv) {
   if (0 != read_kernel_file("kernel.cl", &kernel_bin, &kernel_size))
     return -1;
   program = CL_CHECK2(clCreateProgramWithSource(
-    context, 1, (const char**)&kernel_bin, &kernel_size, &_err));  
+    context, 1, (const char**)&kernel_bin, &kernel_size, &_err));
 #else
   if (0 != read_kernel_file("kernel.pocl", &kernel_bin, &kernel_size))
     return -1;
@@ -156,15 +156,15 @@ int main (int argc, char **argv) {
   kernel = CL_CHECK2(clCreateKernel(program, KERNEL_NAME, &_err));
 
   // Set kernel arguments
-  CL_CHECK(clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&a_memobj));	
-  CL_CHECK(clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&b_memobj));	
+  CL_CHECK(clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&a_memobj));
+  CL_CHECK(clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&b_memobj));
   CL_CHECK(clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&c_memobj));
 
-  // Allocate memories for input arrays and output arrays.    
+  // Allocate memories for input arrays and output arrays.
   h_a = (float*)malloc(nbytes);
   h_b = (float*)malloc(nbytes);
   h_c = (float*)malloc(nbytes);	
-	
+
   // Generate input values
   for (int i = 0; i < size; ++i) {
     h_a[i] = sinf(i)*sinf(i);
@@ -174,7 +174,7 @@ int main (int argc, char **argv) {
   // Creating command queue
   commandQueue = CL_CHECK2(clCreateCommandQueue(context, device_id, 0, &_err));  
 
-	printf("Upload source buffers\n");
+  printf("Upload source buffers\n");
   CL_CHECK(clEnqueueWriteBuffer(commandQueue, a_memobj, CL_TRUE, 0, nbytes, h_a, 0, NULL, NULL));
   CL_CHECK(clEnqueueWriteBuffer(commandQueue, b_memobj, CL_TRUE, 0, nbytes, h_b, 0, NULL, NULL));
 
@@ -195,7 +195,7 @@ int main (int argc, char **argv) {
   for (int i = 0; i < size; ++i) {
     float ref = h_a[i] + h_b[i];
     if (!almost_equal(h_c[i], ref)) {
-      if (errors < 100) 
+      if (errors < 100)
         printf("*** error: [%d] expected=%f, actual=%f, a=%f, b=%f\n", i, ref, h_c[i], h_a[i], h_b[i]);
       ++errors;
     }
@@ -203,10 +203,10 @@ int main (int argc, char **argv) {
   if (0 == errors) {
     printf("PASSED!\n");
   } else {
-    printf("FAILED! - %d errors\n", errors);    
+    printf("FAILED! - %d errors\n", errors);
   }
 
-  // Clean up		
+  // Clean up
   cleanup();  
 
   return errors;
