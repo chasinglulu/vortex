@@ -69,7 +69,7 @@ else
 	TOP = Vortex
 endif
 
-VL_FLAGS = --exe
+VL_FLAGS = --exe --pins-bv 2
 VL_FLAGS += --language 1800-2017 --assert -Wall -Wpedantic
 VL_FLAGS += -Wno-DECLFILENAME -Wno-REDEFMACRO
 VL_FLAGS += --x-initial unique --x-assign unique
