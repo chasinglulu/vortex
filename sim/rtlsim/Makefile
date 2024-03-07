@@ -57,6 +57,7 @@ SRCS += $(DPI_DIR)/util_dpi.cpp $(DPI_DIR)/float_dpi.cpp
 
 ifdef SYSTEMC
 MAIN := $(CURDIR)/main_sc.cpp
+SRCS += $(CURDIR)/trace.cc
 else
 SRCS += $(CURDIR)/processor.cpp
 MAIN := $(CURDIR)/main.cpp

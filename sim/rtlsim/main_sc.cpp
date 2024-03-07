@@ -9,7 +9,9 @@
 
 #include <iostream>
 #include <systemc>
+
 #include "VVortex_axi.h"
+#include "trace.h"
 
 using namespace sc_core;
 using namespace sc_dt;
@@ -241,6 +243,7 @@ SC_MODULE(Processor)
 int sc_main(int argc, char **argv)
 {
 	Processor *vortex;
+	sc_trace_file *trace_fp = NULL;
 
 	Verilated::commandArgs(argc, argv);
 	sc_set_time_resolution(1, SC_PS);
@@ -249,6 +252,8 @@ int sc_main(int argc, char **argv)
 
 	cout << "start vortex" << endl;
 
+	trace_fp = sc_create_vcd_trace_file("trace");
+	trace(trace_fp, *vortex, vortex->name());
 	/* Pull the reset signal.  */
 	vortex->rst.write(true);
 	sc_start(1, SC_US);
@@ -257,6 +262,9 @@ int sc_main(int argc, char **argv)
 	cout << "reset" << endl;
 
 	sc_start();
+	if (trace_fp) {
+		sc_close_vcd_trace_file(trace_fp);
+	}
 
 	return 0;
 }
