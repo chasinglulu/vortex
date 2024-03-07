@@ -54,7 +54,13 @@ RTL_INCLUDE = -I$(RTL_DIR) -I$(DPI_DIR) -I$(RTL_DIR)/libs -I$(RTL_DIR)/interface
 
 SRCS = $(COMMON_DIR)/util.cpp $(COMMON_DIR)/mem.cpp $(COMMON_DIR)/rvfloats.cpp
 SRCS += $(DPI_DIR)/util_dpi.cpp $(DPI_DIR)/float_dpi.cpp
+
+ifdef SYSTEMC
+MAIN := $(CURDIR)/main_sc.cpp
+else
 SRCS += $(CURDIR)/processor.cpp
+MAIN := $(CURDIR)/main.cpp
+endif
 
 ifdef AXI_BUS
 	TOP = Vortex_axi
@@ -106,7 +112,7 @@ PROJECT = rtlsim
 
 all: $(DESTDIR)/$(PROJECT)
 
-$(DESTDIR)/$(PROJECT): $(SRCS) $(CURDIR)/main.cpp
+$(DESTDIR)/$(PROJECT): $(SRCS) $(MAIN)
 	$(VL_ENV) verilator --build $(VL_FLAGS) $^ -CFLAGS '$(CXXFLAGS) -DSTARTUP_ADDR=0x80000000' -LDFLAGS '$(LDFLAGS)' --Mdir $(DESTDIR)/obj_dir -o $@
 	
 $(DESTDIR)/lib$(PROJECT).so: $(SRCS)
