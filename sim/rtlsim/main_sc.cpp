@@ -9,9 +9,13 @@
 
 #include <iostream>
 #include <systemc>
+#include <tlm_utils/simple_initiator_socket.h>
+#include <tlm_utils/simple_target_socket.h>
 
 #include "VVortex_axi.h"
 #include "trace.h"
+
+#include "tlm-bridges/axi2tlm-bridge.h"
 
 using namespace sc_core;
 using namespace sc_dt;
@@ -65,6 +69,8 @@ SC_MODULE(Processor)
 {
 	SC_HAS_PROCESS(Processor);
 	VVortex_axi *device;
+
+	axi2tlm_bridge<32, 512, 10, 8, 2> axi2tlm;
 
 	// Clock
 	sc_clock *clk;
@@ -133,6 +139,7 @@ SC_MODULE(Processor)
 	}
 
 	Processor(sc_module_name name) :
+		axi2tlm("axi2tlm"),
 		rst("rst"),
 		reset("reset"),
 		m_axi_awvalid("m_axi_awvalid"),
@@ -237,6 +244,52 @@ SC_MODULE(Processor)
 		device->dcr_wr_data(dcr_wr_data);
 
 		device->busy(busy);
+
+		axi2tlm.clk(*clk);
+		axi2tlm.resetn(reset);
+		axi2tlm.awvalid(m_axi_awvalid);
+		axi2tlm.awready(m_axi_awready);
+		axi2tlm.awaddr(m_axi_awaddr);
+		axi2tlm.awid(m_axi_awid);
+		axi2tlm.awlen(m_axi_awlen);
+		axi2tlm.awsize(m_axi_awsize);
+		axi2tlm.awburst(m_axi_awburst);
+		axi2tlm.awlock(m_axi_awlock);
+		axi2tlm.awcache(m_axi_awcache);
+		axi2tlm.awprot(m_axi_awprot);
+		axi2tlm.awqos(m_axi_awqos);
+		axi2tlm.awregion(m_axi_awregion);
+
+		axi2tlm.wvalid(m_axi_wvalid);
+		axi2tlm.wready(m_axi_wready);
+		axi2tlm.wdata(m_axi_wdata);
+		axi2tlm.wstrb(m_axi_wstrb);
+		axi2tlm.wlast(m_axi_wlast);
+
+		axi2tlm.bvalid(m_axi_bvalid);
+		axi2tlm.bready(m_axi_bready);
+		axi2tlm.bid(m_axi_bid);
+		axi2tlm.bresp(m_axi_bresp);
+
+		axi2tlm.arvalid(m_axi_arvalid);
+		axi2tlm.arready(m_axi_arready);
+		axi2tlm.araddr(m_axi_araddr);
+		axi2tlm.arid(m_axi_arid);
+		axi2tlm.arlen(m_axi_arlen);
+		axi2tlm.arsize(m_axi_arsize);
+		axi2tlm.arburst(m_axi_arburst);
+		axi2tlm.arlock(m_axi_arlock);
+		axi2tlm.arcache(m_axi_arcache);
+		axi2tlm.arprot(m_axi_arprot);
+		axi2tlm.arqos(m_axi_arqos);
+		axi2tlm.arregion(m_axi_arregion);
+
+		axi2tlm.rvalid(m_axi_rvalid);
+		axi2tlm.rready(m_axi_rready);
+		axi2tlm.rdata(m_axi_rdata);
+		axi2tlm.rlast(m_axi_rlast);
+		axi2tlm.rid(m_axi_rid);
+		axi2tlm.rresp(m_axi_rresp);
 	}
 };
 

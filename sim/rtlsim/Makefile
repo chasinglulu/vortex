@@ -17,6 +17,10 @@ CXXFLAGS += -fPIC -Wno-maybe-uninitialized
 CXXFLAGS += -I$(HW_DIR) -I$(COMMON_DIR)
 CXXFLAGS += -I$(THIRD_PARTY_DIR)/softfloat/source/include
 CXXFLAGS += -I$(THIRD_PARTY_DIR)
+CXXFLAGS += -I$(CURDIR)/tlm-bridges
+CXXFLAGS += -I$(CURDIR)/tlm-modules
+CXXFLAGS += -I$(CURDIR)/tlm-extensions
+CXXFLAGS += -I$(CURDIR)
 CXXFLAGS += -DXLEN_$(XLEN)
 ifdef SYSTEMC
 CXXFLAGS += -I$(SYSTEMC_INCLUDE)
