@@ -13,6 +13,7 @@
 #include <tlm_utils/simple_target_socket.h>
 
 #include "VVortex_axi.h"
+#include "tlm2dcr_bridge.h"
 #include "trace.h"
 
 #include "tlm-bridges/axi2tlm-bridge.h"
@@ -71,6 +72,7 @@ SC_MODULE(Processor)
 	VVortex_axi *device;
 
 	axi2tlm_bridge<32, 512, 10, 8, 2> axi2tlm;
+	tlm2dcr_bridge tlm2dcr;
 
 	// Clock
 	sc_clock *clk;
@@ -89,6 +91,7 @@ SC_MODULE(Processor)
 	sc_signal<sc_bv<3> > m_axi_awprot;
 	sc_signal<sc_bv<4> > m_axi_awqos;
 	sc_signal<sc_bv<4> > m_axi_awregion;
+	sc_signal<sc_bv<2> > m_axi_awuser;
 
 	// AXI write request data channel
 	sc_signal<bool> m_axi_wvalid;
@@ -96,12 +99,14 @@ SC_MODULE(Processor)
 	sc_signal<sc_bv<XLEN*16> > m_axi_wdata;
 	sc_signal<sc_bv<64> > m_axi_wstrb;
 	sc_signal<bool> m_axi_wlast;
+	sc_signal<sc_bv<2> > m_axi_wuser;
 
 	// AXI write response channel
 	sc_signal<bool> m_axi_bvalid;
 	sc_signal<bool> m_axi_bready;
 	sc_signal<sc_bv<10> > m_axi_bid;
 	sc_signal<sc_bv<2> > m_axi_bresp;
+	sc_signal<sc_bv<2> > m_axi_buser;
 
 	// AXI read request channel
 	sc_signal<bool> m_axi_arvalid;
@@ -116,6 +121,7 @@ SC_MODULE(Processor)
 	sc_signal<sc_bv<3> > m_axi_arprot;
 	sc_signal<sc_bv<4> > m_axi_arqos;
 	sc_signal<sc_bv<4> > m_axi_arregion;
+	sc_signal<sc_bv<2> > m_axi_aruser;
 
 	// AXI read response channel
 	sc_signal<bool> m_axi_rvalid;
@@ -124,6 +130,7 @@ SC_MODULE(Processor)
 	sc_signal<bool> m_axi_rlast;
 	sc_signal<sc_bv<10> > m_axi_rid;
 	sc_signal<sc_bv<2> > m_axi_rresp;
+	sc_signal<sc_bv<2> > m_axi_ruser;
 
 	// DCR write request
 	sc_signal<bool> dcr_wr_valid;
@@ -140,6 +147,7 @@ SC_MODULE(Processor)
 
 	Processor(sc_module_name name) :
 		axi2tlm("axi2tlm"),
+		tlm2dcr("tlm2dcr"),
 		rst("rst"),
 		reset("reset"),
 		m_axi_awvalid("m_axi_awvalid"),
@@ -154,15 +162,18 @@ SC_MODULE(Processor)
 		m_axi_awprot("m_axi_awprot"),
 		m_axi_awqos("m_axi_awqos"),
 		m_axi_awregion("m_axi_awregion"),
+		m_axi_awuser("m_axi_awuser"),
 		m_axi_wvalid("m_axi_wvalid"),
 		m_axi_wready("m_axi_wready"),
 		m_axi_wdata("m_axi_wdata"),
 		m_axi_wstrb("m_axi_wstrb"),
 		m_axi_wlast("m_axi_wlast"),
+		m_axi_wuser("m_axi_wuser"),
 		m_axi_bvalid("m_axi_bvalid"),
 		m_axi_bready("m_axi_bready"),
 		m_axi_bid("m_axi_bid"),
 		m_axi_bresp("m_axi_bresp"),
+		m_axi_buser("m_axi_buser"),
 		m_axi_arvalid("m_axi_arvalid"),
 		m_axi_arready("m_axi_arready"),
 		m_axi_araddr("m_axi_araddr"),
@@ -175,12 +186,14 @@ SC_MODULE(Processor)
 		m_axi_arprot("m_axi_arprot"),
 		m_axi_arqos("m_axi_arqos"),
 		m_axi_arregion("m_axi_arregion"),
+		m_axi_aruser("m_axi_aruser"),
 		m_axi_rvalid("m_axi_rvalid"),
 		m_axi_rready("m_axi_rready"),
 		m_axi_rdata("m_axi_rdata"),
 		m_axi_rlast("m_axi_rlast"),
 		m_axi_rid("m_axi_rid"),
 		m_axi_rresp("m_axi_rresp"),
+		m_axi_ruser("m_axi_ruser"),
 		dcr_wr_valid("dcr_wr_valid"),
 		dcr_wr_addr("dcr_wr_addr"),
 		dcr_wr_data("dcr_wr_data"),
@@ -259,17 +272,20 @@ SC_MODULE(Processor)
 		axi2tlm.awprot(m_axi_awprot);
 		axi2tlm.awqos(m_axi_awqos);
 		axi2tlm.awregion(m_axi_awregion);
+		axi2tlm.awuser(m_axi_awuser);
 
 		axi2tlm.wvalid(m_axi_wvalid);
 		axi2tlm.wready(m_axi_wready);
 		axi2tlm.wdata(m_axi_wdata);
 		axi2tlm.wstrb(m_axi_wstrb);
 		axi2tlm.wlast(m_axi_wlast);
+		axi2tlm.wuser(m_axi_wuser);
 
 		axi2tlm.bvalid(m_axi_bvalid);
 		axi2tlm.bready(m_axi_bready);
 		axi2tlm.bid(m_axi_bid);
 		axi2tlm.bresp(m_axi_bresp);
+		axi2tlm.buser(m_axi_buser);
 
 		axi2tlm.arvalid(m_axi_arvalid);
 		axi2tlm.arready(m_axi_arready);
@@ -283,6 +299,7 @@ SC_MODULE(Processor)
 		axi2tlm.arprot(m_axi_arprot);
 		axi2tlm.arqos(m_axi_arqos);
 		axi2tlm.arregion(m_axi_arregion);
+		axi2tlm.aruser(m_axi_aruser);
 
 		axi2tlm.rvalid(m_axi_rvalid);
 		axi2tlm.rready(m_axi_rready);
@@ -290,6 +307,12 @@ SC_MODULE(Processor)
 		axi2tlm.rlast(m_axi_rlast);
 		axi2tlm.rid(m_axi_rid);
 		axi2tlm.rresp(m_axi_rresp);
+		axi2tlm.ruser(m_axi_ruser);
+
+		tlm2dcr.clk(*clk);
+		tlm2dcr.dcr_wr_valid(dcr_wr_valid);
+		tlm2dcr.dcr_wr_addr(dcr_wr_addr);
+		tlm2dcr.dcr_wr_data(dcr_wr_data);
 	}
 };
 
