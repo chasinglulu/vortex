@@ -69,10 +69,17 @@ void sim_trace_enable(bool enable) {
 SC_MODULE(Processor)
 {
 	SC_HAS_PROCESS(Processor);
+
 	VVortex_axi *device;
 
+	uint64_t dcr_addr;
+	uint64_t dcr_data;
+
+	tlm_utils::simple_initiator_socket<Processor> dcr_interface;
+	tlm_utils::simple_target_socket<Processor> m_axi;
+
 	axi2tlm_bridge<32, 512, 10, 8, 2> axi2tlm;
-	tlm2dcr_bridge tlm2dcr;
+	tlm2dcr_bridge<32> tlm2dcr;
 
 	// Clock
 	sc_clock *clk;
@@ -145,6 +152,49 @@ SC_MODULE(Processor)
 		reset.write(!rst.read());
 	}
 
+	void write_dcr(uint64_t addr, uint64_t value)
+	{
+		this->dcr_addr = addr;
+		this->dcr_data = value;
+		ev_write_dcr.notify();
+		cout << "function: write_dcr" << endl;
+	}
+
+	sc_event ev_write_dcr;
+	void write_dcr_(void)
+	{
+		tlm::tlm_generic_payload tr;
+		sc_time delay(SC_ZERO_TIME);
+		int resp;
+
+		while (1) {
+			wait(ev_write_dcr);
+
+			tr.set_command(tlm::TLM_WRITE_COMMAND);
+			tr.set_address(dcr_addr);
+			tr.set_data_ptr((unsigned char *)&dcr_data);
+			tr.set_data_length(sizeof(dcr_data));
+			tr.set_dmi_allowed(false);
+			tr.set_response_status(tlm::TLM_INCOMPLETE_RESPONSE);
+
+			dcr_interface->b_transport(tr, delay);
+
+			switch (tr.get_response_status()) {
+			case tlm::TLM_OK_RESPONSE:
+				resp = 0;
+				break;
+			case tlm::TLM_ADDRESS_ERROR_RESPONSE:
+				resp = -1;
+				break;
+			default:
+				resp = -2;
+				break;
+			}
+
+			cout << "resp = " << resp << endl;
+		}
+	}
+
 	Processor(sc_module_name name) :
 		axi2tlm("axi2tlm"),
 		tlm2dcr("tlm2dcr"),
@@ -201,6 +251,7 @@ SC_MODULE(Processor)
 	{
 		SC_METHOD(gen_rst_n);
 		sensitive << rst;
+		SC_THREAD(write_dcr_);
 
 		/* Slow clock to keep simulation fast.  */
 		clk = new sc_clock("clk", sc_time(10, SC_US));
@@ -310,9 +361,13 @@ SC_MODULE(Processor)
 		axi2tlm.ruser(m_axi_ruser);
 
 		tlm2dcr.clk(*clk);
+		tlm2dcr.resetn(reset);
 		tlm2dcr.dcr_wr_valid(dcr_wr_valid);
 		tlm2dcr.dcr_wr_addr(dcr_wr_addr);
 		tlm2dcr.dcr_wr_data(dcr_wr_data);
+
+		dcr_interface.bind(tlm2dcr.tgt_socket);
+		axi2tlm.socket.bind(m_axi);
 	}
 };
 
@@ -335,7 +390,9 @@ int sc_main(int argc, char **argv)
 	sc_start(1, SC_US);
 	vortex->rst.write(false);
 
-	cout << "reset" << endl;
+	vortex->write_dcr(0x1, 0x80000000);
+	sc_start(30, sc_core::SC_US);
+	vortex->write_dcr(0x3, 0x00000000);
 
 	sc_start();
 	if (trace_fp) {

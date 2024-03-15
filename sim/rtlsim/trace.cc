@@ -72,6 +72,7 @@ void trace(sc_trace_file* tf, const sc_module& mod, const char *txt)
 		TRACE_TYPE(sc_bv, 8);
 		TRACE_TYPE(sc_bv, 9);
 		TRACE_TYPE(sc_bv, 10);
+		TRACE_TYPE(sc_bv, 12);
 		TRACE_TYPE(sc_bv, 16);
 		TRACE_TYPE(sc_bv, 32);
 		TRACE_TYPE(sc_bv, 64);
