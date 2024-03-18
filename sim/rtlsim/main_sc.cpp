@@ -78,18 +78,26 @@ SC_MODULE(Processor)
 	tlm_utils::simple_initiator_socket<Processor> dcr_interface;
 	tlm_utils::simple_target_socket<Processor> m_axi;
 
+#ifdef DEBUG
+	axi2tlm_bridge<32, 512, 53, 8, 2> axi2tlm;
+#else
 	axi2tlm_bridge<32, 512, 10, 8, 2> axi2tlm;
+#endif
 	tlm2dcr_bridge<32> tlm2dcr;
 
 	// Clock
 	sc_clock *clk;
-	sc_signal<bool> rst, reset;
+	sc_signal<bool> rst, reset_n;
 
 	// AXI write request address channel
 	sc_signal<bool> m_axi_awvalid;
 	sc_signal<bool> m_axi_awready;
 	sc_signal<sc_bv<XLEN> > m_axi_awaddr;
+#ifdef DEBUG
+	sc_signal<sc_bv<53> > m_axi_awid;
+#else
 	sc_signal<sc_bv<10> > m_axi_awid;
+#endif
 	sc_signal<sc_bv<8> > m_axi_awlen;
 	sc_signal<sc_bv<3> > m_axi_awsize;
 	sc_signal<sc_bv<2> > m_axi_awburst;
@@ -111,7 +119,11 @@ SC_MODULE(Processor)
 	// AXI write response channel
 	sc_signal<bool> m_axi_bvalid;
 	sc_signal<bool> m_axi_bready;
+#ifdef DEBUG
+	sc_signal<sc_bv<53> > m_axi_bid;
+#else
 	sc_signal<sc_bv<10> > m_axi_bid;
+#endif
 	sc_signal<sc_bv<2> > m_axi_bresp;
 	sc_signal<sc_bv<2> > m_axi_buser;
 
@@ -119,7 +131,11 @@ SC_MODULE(Processor)
 	sc_signal<bool> m_axi_arvalid;
 	sc_signal<bool> m_axi_arready;
 	sc_signal<sc_bv<XLEN> > m_axi_araddr;
+#ifdef DEBUG
+	sc_signal<sc_bv<53> > m_axi_arid;
+#else
 	sc_signal<sc_bv<10> > m_axi_arid;
+#endif
 	sc_signal<sc_bv<8> > m_axi_arlen;
 	sc_signal<sc_bv<3> > m_axi_arsize;
 	sc_signal<sc_bv<2> > m_axi_arburst;
@@ -135,7 +151,11 @@ SC_MODULE(Processor)
 	sc_signal<bool> m_axi_rready;
 	sc_signal<sc_bv<XLEN*16> > m_axi_rdata;
 	sc_signal<bool> m_axi_rlast;
+#ifdef DEBUG
+	sc_signal<sc_bv<53> > m_axi_rid;
+#else
 	sc_signal<sc_bv<10> > m_axi_rid;
+#endif
 	sc_signal<sc_bv<2> > m_axi_rresp;
 	sc_signal<sc_bv<2> > m_axi_ruser;
 
@@ -149,7 +169,7 @@ SC_MODULE(Processor)
 
 	void gen_rst_n(void)
 	{
-		reset.write(!rst.read());
+		reset_n.write(!rst.read());
 	}
 
 	void write_dcr(uint64_t addr, uint64_t value)
@@ -199,7 +219,7 @@ SC_MODULE(Processor)
 		axi2tlm("axi2tlm"),
 		tlm2dcr("tlm2dcr"),
 		rst("rst"),
-		reset("reset"),
+		reset_n("reset_n"),
 		m_axi_awvalid("m_axi_awvalid"),
 		m_axi_awready("m_axi_awready"),
 		m_axi_awaddr("m_axi_awaddr"),
@@ -258,7 +278,7 @@ SC_MODULE(Processor)
 		device = new VVortex_axi("gpgpu");
 
 		device->clk(*clk);
-		device->reset(reset);
+		device->reset(rst);
 		device->m_axi_awvalid[0](m_axi_awvalid);
 		device->m_axi_awready[0](m_axi_awready);
 		device->m_axi_awaddr[0](m_axi_awaddr);
@@ -310,7 +330,7 @@ SC_MODULE(Processor)
 		device->busy(busy);
 
 		axi2tlm.clk(*clk);
-		axi2tlm.resetn(reset);
+		axi2tlm.resetn(reset_n);
 		axi2tlm.awvalid(m_axi_awvalid);
 		axi2tlm.awready(m_axi_awready);
 		axi2tlm.awaddr(m_axi_awaddr);
@@ -361,13 +381,31 @@ SC_MODULE(Processor)
 		axi2tlm.ruser(m_axi_ruser);
 
 		tlm2dcr.clk(*clk);
-		tlm2dcr.resetn(reset);
+		tlm2dcr.resetn(reset_n);
 		tlm2dcr.dcr_wr_valid(dcr_wr_valid);
 		tlm2dcr.dcr_wr_addr(dcr_wr_addr);
 		tlm2dcr.dcr_wr_data(dcr_wr_data);
 
 		dcr_interface.bind(tlm2dcr.tgt_socket);
 		axi2tlm.socket.bind(m_axi);
+
+		m_axi.register_b_transport(this, &Processor::b_transport);
+	}
+
+private:
+
+
+	virtual void b_transport(tlm::tlm_generic_payload& trans,
+					sc_time& delay)
+	{
+		tlm::tlm_command cmd = trans.get_command();
+		sc_dt::uint64    addr = trans.get_address();
+		unsigned char*   data = trans.get_data_ptr();
+		unsigned int     len = trans.get_data_length();
+		// unsigned char*   byt = trans.get_byte_enable_ptr();
+		// unsigned int     wid = trans.get_streaming_width();
+
+		cout << cmd << " " << addr << " " << len << " " << data << endl;
 	}
 };
 
@@ -393,6 +431,9 @@ int sc_main(int argc, char **argv)
 	vortex->write_dcr(0x1, 0x80000000);
 	sc_start(30, sc_core::SC_US);
 	vortex->write_dcr(0x3, 0x00000000);
+
+	sc_start(30, SC_US);
+	vortex->rst.write(true);
 
 	sc_start();
 	if (trace_fp) {

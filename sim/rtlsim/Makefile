@@ -101,7 +101,7 @@ VL_FLAGS += -j $(THREADS)
 # Debugigng
 ifdef DEBUG
 	VL_FLAGS += --trace --trace-structs $(DBG_FLAGS)
-	CXXFLAGS += -g -O0 $(DBG_FLAGS)
+	CXXFLAGS += -DDEBUG -g -O0 $(DBG_FLAGS)
 else    
 	VL_FLAGS += -DNDEBUG
 	CXXFLAGS += -O2 -DNDEBUG
