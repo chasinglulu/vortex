@@ -97,6 +97,7 @@ private:
 
 		do {
 			wait(clk.negedge_event());
+			wait(clk.posedge_event());
 
 			dcr_wr_valid.write(false);
 		} while (dcr_wr_valid.read() == true);

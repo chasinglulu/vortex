@@ -167,10 +167,10 @@ SC_MODULE(Processor)
 	// Status
 	sc_signal<bool> busy;
 
-	void gen_rst_n(void)
-	{
-		reset_n.write(!rst.read());
-	}
+	// void gen_rst_n(void)
+	// {
+	// 	reset_n.write(!rst.read());
+	// }
 
 	void write_dcr(uint64_t addr, uint64_t value)
 	{
@@ -269,12 +269,12 @@ SC_MODULE(Processor)
 		dcr_wr_data("dcr_wr_data"),
 		busy("busy")
 	{
-		SC_METHOD(gen_rst_n);
-		sensitive << rst;
+		// SC_METHOD(gen_rst_n);
+		// sensitive << rst;
 		SC_THREAD(write_dcr_);
 
 		/* Slow clock to keep simulation fast.  */
-		clk = new sc_clock("clk", sc_time(10, SC_US));
+		clk = new sc_clock("clk", sc_time(2, SC_PS));
 		device = new VVortex_axi("gpgpu");
 
 		device->clk(*clk);
@@ -402,10 +402,12 @@ private:
 		sc_dt::uint64    addr = trans.get_address();
 		unsigned char*   data = trans.get_data_ptr();
 		unsigned int     len = trans.get_data_length();
-		// unsigned char*   byt = trans.get_byte_enable_ptr();
+		unsigned char*   byt = trans.get_byte_enable_ptr();
 		// unsigned int     wid = trans.get_streaming_width();
 
-		cout << cmd << " " << addr << " " << len << " " << data << endl;
+		cout << "################### " << cmd << " 0x" << std::hex << addr << " 0x" << std::hex << len << endl;
+
+		trans.set_response_status(tlm::TLM_OK_RESPONSE);
 	}
 };
 
@@ -417,23 +419,43 @@ int sc_main(int argc, char **argv)
 	Verilated::commandArgs(argc, argv);
 	sc_set_time_resolution(1, SC_PS);
 
+	trace_fp = sc_create_vcd_trace_file("trace");
+
+	// force random values for unitialized signals
+	Verilated::randReset(2);
+	Verilated::randSeed(50);
+	// turn off assertion before reset
+	Verilated::assertOn(false);
+
 	vortex = new Processor("vortex");
+	trace(trace_fp, *vortex, vortex->name());
 
 	cout << "start vortex" << endl;
 
-	trace_fp = sc_create_vcd_trace_file("trace");
-	trace(trace_fp, *vortex, vortex->name());
 	/* Pull the reset signal.  */
+	vortex->reset_n.write(false);
+	sc_start(2, SC_PS);
+	vortex->reset_n.write(true);
+
+	// AXI bus reset
+	// vortex->m_axi_wready.write(false);
+	// vortex->m_axi_awready.write(false);
+	// vortex->m_axi_arready.write(false);
+	// vortex->m_axi_rvalid.write(false);
+	// vortex->m_axi_bvalid.write(false);
+
+	// vortex->dcr_wr_valid.write(false);
+
 	vortex->rst.write(true);
-	sc_start(1, SC_US);
+	sc_start(8, SC_PS);
+
+	// Turn on assertion after reset
+	Verilated::assertOn(true);
+
 	vortex->rst.write(false);
-
 	vortex->write_dcr(0x1, 0x80000000);
-	sc_start(30, sc_core::SC_US);
+	sc_start(10, sc_core::SC_PS);
 	vortex->write_dcr(0x3, 0x00000000);
-
-	sc_start(30, SC_US);
-	vortex->rst.write(true);
 
 	sc_start();
 	if (trace_fp) {
