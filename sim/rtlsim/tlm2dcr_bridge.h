@@ -26,8 +26,6 @@
 #define TLM2DCR_BRIDGE_H__
 #define SC_INCLUDE_DYNAMIC_PROCESSES
 
-#include "tlm-extensions/genattr.h"
-
 template <int DATA_WIDTH>
 class tlm2dcr_bridge
 : public sc_core::sc_module
@@ -74,6 +72,11 @@ private:
 		sc_dt::uint64 addr = trans.get_address();
 		uint8_t *data = trans.get_data_ptr();
 		unsigned int len = trans.get_data_length();
+
+		if (cmd != tlm::TLM_WRITE_COMMAND) {
+			trans.set_response_status(tlm::TLM_COMMAND_ERROR_RESPONSE);
+			return;
+		}
 
 		// Since we're going to do waits in order to wiggle the
 		// AXI signals, we need to eliminate the accumulated

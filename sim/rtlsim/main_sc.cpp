@@ -8,6 +8,9 @@
  */
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <unordered_map>
 #include <systemc>
 #include <tlm_utils/simple_initiator_socket.h>
 #include <tlm_utils/simple_target_socket.h>
@@ -15,12 +18,15 @@
 #include "VVortex_axi.h"
 #include "tlm2dcr_bridge.h"
 #include "trace.h"
+#include "util.h"
+#include "mem.h"
 
 #include "tlm-bridges/axi2tlm-bridge.h"
 
 using namespace sc_core;
 using namespace sc_dt;
 using namespace std;
+using namespace vortex;
 
 #ifndef TRACE_START_TIME
 #define TRACE_START_TIME 0ull
@@ -66,17 +72,23 @@ void sim_trace_enable(bool enable) {
 #endif
 #endif
 
+#define IO_COUT_ADDR (0xFF000000 + (1 << 14))
+#define IO_COUT_SIZE 64
+
 SC_MODULE(Processor)
 {
 	SC_HAS_PROCESS(Processor);
 
 	VVortex_axi *device;
+	RAM *ram_;
 
 	uint64_t dcr_addr;
 	uint64_t dcr_data;
 
 	tlm_utils::simple_initiator_socket<Processor> dcr_interface;
 	tlm_utils::simple_target_socket<Processor> m_axi;
+
+	std::unordered_map<int, std::stringstream> print_bufs_;
 
 #ifdef DEBUG
 	axi2tlm_bridge<32, 512, 53, 8, 2> axi2tlm;
@@ -167,17 +179,17 @@ SC_MODULE(Processor)
 	// Status
 	sc_signal<bool> busy;
 
-	// void gen_rst_n(void)
-	// {
-	// 	reset_n.write(!rst.read());
-	// }
-
 	void write_dcr(uint64_t addr, uint64_t value)
 	{
 		this->dcr_addr = addr;
 		this->dcr_data = value;
 		ev_write_dcr.notify();
 		cout << "function: write_dcr" << endl;
+	}
+
+	void attach_ram(RAM* mem)
+	{
+		ram_ = mem;
 	}
 
 	sc_event ev_write_dcr;
@@ -269,9 +281,9 @@ SC_MODULE(Processor)
 		dcr_wr_data("dcr_wr_data"),
 		busy("busy")
 	{
-		// SC_METHOD(gen_rst_n);
-		// sensitive << rst;
 		SC_THREAD(write_dcr_);
+
+		ram_ = nullptr;
 
 		/* Slow clock to keep simulation fast.  */
 		clk = new sc_clock("clk", sc_time(2, SC_PS));
@@ -394,27 +406,93 @@ SC_MODULE(Processor)
 
 private:
 
-
 	virtual void b_transport(tlm::tlm_generic_payload& trans,
 					sc_time& delay)
 	{
 		tlm::tlm_command cmd = trans.get_command();
 		sc_dt::uint64    addr = trans.get_address();
-		unsigned char*   data = trans.get_data_ptr();
+		uint8_t*         data = trans.get_data_ptr();
 		unsigned int     len = trans.get_data_length();
-		unsigned char*   byt = trans.get_byte_enable_ptr();
+		uint8_t*   byteen = trans.get_byte_enable_ptr();
+		unsigned int     bye_len = trans.get_byte_enable_length();
 		// unsigned int     wid = trans.get_streaming_width();
 
-		cout << "################### " << cmd << " 0x" << std::hex << addr << " 0x" << std::hex << len << endl;
+		//cout << "#################### 0x" << hex <<bye_len << endl;
+
+		if (cmd == tlm::TLM_READ_COMMAND) {
+			ram_->read(data, addr, 64);
+		} else {
+			if (cmd != tlm::TLM_WRITE_COMMAND) {
+				trans.set_response_status(tlm::TLM_COMMAND_ERROR_RESPONSE);
+				return;
+			}
+
+			cout << "################### " << cmd << " 0x" << std::hex << addr << " 0x" << std::hex << len << endl;
+			// check console output
+			if (addr >= uint64_t(IO_COUT_ADDR)
+				&& addr < (uint64_t(IO_COUT_ADDR) + IO_COUT_SIZE)) {
+				for (int i = 0; i < 64; i++) {
+					if (int(byteen[i]) & 0xFF) {
+						auto& ss_buf = print_bufs_[i];
+						char c = int(data[i]);
+						ss_buf << c;
+						if (c == '\n') {
+							std::cout << std::dec << "#" << i << ": " << ss_buf.str() << std::flush;
+										ss_buf.str("");
+						}
+					}
+				}
+			} else {
+				for (int i = 0; i < 64; i++) {
+					//cout << "byteen[" << i <<"] = 0x" << hex <<int(byteen[i]) << " data[" << i << "] = 0x" << hex<<int(data[i]) << endl;
+					if (int(byteen[i]) & 0xFF) {
+						//cout << "addr = 0x" << addr + i << endl;
+						(*ram_)[addr + i] = int(data[i]);
+					}
+				}
+			}
+		}
 
 		trans.set_response_status(tlm::TLM_OK_RESPONSE);
 	}
 };
 
+static void show_usage() {
+	std::cout << "Usage: [-h: help] <program>" << std::endl;
+}
+
+const char* program = nullptr;
+
+static void parse_args(int argc, char **argv) {
+	int c;
+	while ((c = getopt(argc, argv, "h?")) != -1) {
+		switch (c) {
+		case 'h':
+		case '?':
+			show_usage();
+			exit(0);
+			break;
+		default:
+			show_usage();
+			exit(-1);
+		}
+	}
+
+	if (optind < argc) {
+		program = argv[optind];
+		std::cout << "Running " << program << "..." << std::endl;
+	} else {
+		show_usage();
+		exit(-1);
+	}
+}
+
 int sc_main(int argc, char **argv)
 {
 	Processor *vortex;
 	sc_trace_file *trace_fp = NULL;
+
+	parse_args(argc, argv);
 
 	Verilated::commandArgs(argc, argv);
 	sc_set_time_resolution(1, SC_PS);
@@ -427,7 +505,13 @@ int sc_main(int argc, char **argv)
 	// turn off assertion before reset
 	Verilated::assertOn(false);
 
+	// create memory module
+	vortex::RAM ram(4096);
+
 	vortex = new Processor("vortex");
+
+	// attach memory module
+	vortex->attach_ram(&ram);
 	trace(trace_fp, *vortex, vortex->name());
 
 	cout << "start vortex" << endl;
@@ -448,14 +532,27 @@ int sc_main(int argc, char **argv)
 
 	vortex->rst.write(true);
 	sc_start(8, SC_PS);
+	vortex->rst.write(false);
 
 	// Turn on assertion after reset
 	Verilated::assertOn(true);
 
-	vortex->rst.write(false);
 	vortex->write_dcr(0x1, 0x80000000);
 	sc_start(10, sc_core::SC_PS);
 	vortex->write_dcr(0x3, 0x00000000);
+
+	// load program
+	{
+		std::string program_ext(fileExtension(program));
+		if (program_ext == "bin") {
+			ram.loadBinImage(program, 0x80000000);
+		} else if (program_ext == "hex") {
+			ram.loadHexImage(program);
+		} else {
+			std::cout << "*** error: only *.bin or *.hex images supported." << std::endl;
+			return -1;
+		}
+	}
 
 	sc_start();
 	if (trace_fp) {
